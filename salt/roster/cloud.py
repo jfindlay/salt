@@ -119,6 +119,12 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     if sudo:
         ret['tgt']['sudo'] = sudo
 
+    tty = salt.config.get_cloud_config_value(
+        'tty', vm_, cloud_opts, search_global=False, default=None
+    )
+    if tty:
+        ret['tgt']['tty'] = tty
+
     return ret
 
 
