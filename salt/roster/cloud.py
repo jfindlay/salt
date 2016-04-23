@@ -71,6 +71,9 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     }
 
     full_info = info.get(provider, {}).get(driver, {}).get(tgt, {}).get(tgt, {})
+    cloud_opts = salt.config.cloud_config('/etc/salt/cloud')
+
+    # IPv4 address
     public_ips = full_info.get('public_ips', [])
     private_ips = full_info.get('private_ips', [])
     ip_list = []
@@ -89,19 +92,21 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
         'host': preferred_ip,
     }
 
-    cloud_opts = salt.config.cloud_config('/etc/salt/cloud')
+    # ssh username
     ssh_username = salt.utils.cloud.ssh_usernames({}, cloud_opts)
     if isinstance(ssh_username, string_types):
         ret['tgt']['user'] = ssh_username
     elif isinstance(ssh_username, list):
         ret['tgt']['user'] = ssh_username[0]
 
+    # password
     password = salt.config.get_cloud_config_value(
         'password', vm_, cloud_opts, search_global=False, default=None
     )
     if password:
         ret['tgt']['password'] = password
 
+    # ssh secret key file
     private_key = salt.config.get_cloud_config_value(
         'private_key', vm_, cloud_opts, search_global=False, default=None
     )
@@ -113,12 +118,14 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     elif ssh_key_file:
         ret['tgt']['priv'] = ssh_key_file
 
+    # sudo
     sudo = salt.config.get_cloud_config_value(
         'sudo', vm_, cloud_opts, search_global=False, default=None
     )
     if sudo:
         ret['tgt']['sudo'] = sudo
 
+    # tty
     tty = salt.config.get_cloud_config_value(
         'tty', vm_, cloud_opts, search_global=False, default=None
     )
