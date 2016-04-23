@@ -102,11 +102,16 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     if password:
         ret['tgt']['password'] = password
 
-    key_filename = salt.config.get_cloud_config_value(
+    private_key = salt.config.get_cloud_config_value(
         'private_key', vm_, cloud_opts, search_global=False, default=None
     )
-    if key_filename:
-        ret['tgt']['priv'] = key_filename
+    ssh_key_file = salt.config.get_cloud_config_value(
+        'ssh_key_file', vm_, cloud_opts, search_global=False, default=None
+    )
+    if private_key:
+        ret['tgt']['priv'] = private_key
+    elif ssh_key_file:
+        ret['tgt']['priv'] = ssh_key_file
 
     sudo = salt.config.get_cloud_config_value(
         'sudo', vm_, cloud_opts, search_global=False, default=None
