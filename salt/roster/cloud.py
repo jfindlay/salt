@@ -2,20 +2,56 @@
 '''
 Use the cloud cache on the master to derive IPv4 addresses based on minion ID.
 
-This roster requires that the minion in question was created using at least the
-2015.5.0 version of Salt Cloud. Starting with the 2015.5.0 release, Salt Cloud
-maintains an index of minions that it creates and deletes. This index tracks the
-provider and profile configuration used to provision the minion, including
-authentication information. So long as this configuration remains current, it can
-be used by Salt SSH to log into any minion in the index.
+.. note::
 
-To connect as a user other than root, modify the cloud configuration file
-usually located at /etc/salt/cloud. For example, add the following:
+    This roster requires that the minion in question was created using at least
+    the 2015.5.0 version of Salt Cloud.
+
+Starting with the 2015.5.0 release, Salt Cloud maintains an index of minions
+that it creates and deletes. This index tracks the provider and profile
+configuration used to provision the minion, including authentication
+information. So long as this configuration remains current, it can be used by
+Salt SSH to log into any minion in the index.
+
+To use the cloud roster, set the following config in the cloud configuration
+file, usually located at ``/etc/salt/cloud``:
+
+.. code-block:: yaml
+
+    update_cachedir: True
+
+and run the following command to create the cache:
+
+.. code-block:: bash
+
+    salt-cloud --full-query > /dev/null
+
+All minions visible to Salt Cloud should be now accessible over Salt SSH.
+
+.. code-block:: bash
+
+    salt-ssh --roster cloud -i '*' test.ping
+
+To connect as a user other than root, modify ``/etc/salt/cloud``. For example,
+add the following:
 
 .. code-block:: yaml
 
     ssh_username: my_user
     sudo: True
+    tty: True
+
+If a cloud minion has more than one IPv4 address attached to it, the cloud
+roster will prioritize addresses in this order: public, private, local.  You
+may override this ordering with the ``roster_order`` config in
+``/etc/salt/cloud``:
+
+.. code-block:: yaml
+
+    roster_order:
+      - private
+      - public
+      - local
 '''
 
 # Import python libs
