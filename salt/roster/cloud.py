@@ -79,7 +79,6 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     ret = {}
 
     cache = os.path.join(syspaths.CACHE_DIR, 'cloud', 'index.p')
-
     if not os.path.exists(cache):
         return {}
 
@@ -87,7 +86,6 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
         cache_data = msgpack.load(fh_)
 
     indexed_minion = cache_data.get(tgt, None)
-
     if indexed_minion is None:
         return {}
 
@@ -98,93 +96,159 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     if not info:
         return {}
 
-    provider = indexed_minion.get('provider', None)
-    profile = indexed_minion.get('profile', None)
-    driver = indexed_minion.get('driver', None)
-    vm_ = {
-        'provider': provider,
-        'profile': profile,
-    }
-
-    full_info = info.get(provider, {}).get(driver, {}).get(tgt, {}).get(tgt, {})
-    cloud_opts = salt.config.cloud_config('/etc/salt/cloud')
-
-    # IPv4 address
-    public_ips = full_info.get('public_ips', [])
-    private_ips = full_info.get('private_ips', [])
-    ip_list = []
-    for item in (public_ips, private_ips):
-        if isinstance(item, list):
-            ip_list = ip_list + item
-        elif isinstance(item, string_types):
-            ip_list.append(item)
-
     roster_order = __opts__.get('roster_order', (
         'public', 'private', 'local'
     ))
-    preferred_ip = extract_ipv4(roster_order, ip_list)
 
-    ret['tgt'] = {
-        'host': preferred_ip,
-    }
+    roster_opts = CloudRosterOpts(tgt, indexed_minion, info, roster_order)
 
-    # ssh username
-    ssh_username = salt.utils.cloud.ssh_usernames({}, cloud_opts)
-    if isinstance(ssh_username, string_types):
-        ret['tgt']['user'] = ssh_username
-    elif isinstance(ssh_username, list):
-        ret['tgt']['user'] = ssh_username[0]
+    # IPv4 address
+    if roster_opts.host:
+        ret['tgt']['host'] = roster_opts.host
+
+    # ssh user name
+    if roster_opts.user:
+        ret['tgt']['user'] = roster_opts.user
 
     # password
-    password = salt.config.get_cloud_config_value(
-        'password', vm_, cloud_opts, search_global=False, default=None
-    )
-    if password:
-        ret['tgt']['password'] = password
+    if roster_opts.password:
+        ret['tgt']['password'] = roster_opts.password
 
     # ssh secret key file
-    private_key = salt.config.get_cloud_config_value(
-        'private_key', vm_, cloud_opts, search_global=False, default=None
-    )
-    ssh_key_file = salt.config.get_cloud_config_value(
-        'ssh_key_file', vm_, cloud_opts, search_global=False, default=None
-    )
-    if private_key:
-        ret['tgt']['priv'] = private_key
-    elif ssh_key_file:
-        ret['tgt']['priv'] = ssh_key_file
+    if roster_opts.priv:
+        ret['tgt']['priv'] = roster_opts.priv
 
     # sudo
-    sudo = salt.config.get_cloud_config_value(
-        'sudo', vm_, cloud_opts, search_global=False, default=None
-    )
-    if sudo:
-        ret['tgt']['sudo'] = sudo
+    if roster_opts.sudo:
+        ret['tgt']['sudo'] = roster_opts.sudo
 
     # tty
-    tty = salt.config.get_cloud_config_value(
-        'tty', vm_, cloud_opts, search_global=False, default=None
-    )
-    if tty:
-        ret['tgt']['tty'] = tty
+    if roster_opts.tty:
+        ret['tgt']['tty'] = roster_opts.tty
 
     return ret
 
 
-def extract_ipv4(roster_order, ipv4):
+class CloudRosterOpts(object):
     '''
-    Extract the preferred IP address from the ipv4 grain
+    Extract roster configs from provider, profile, and instance data
     '''
-    for ip_type in roster_order:
-        for ip_ in ipv4:
-            if ':' in ip_:
-                continue
-            if not salt.utils.validate.net.ipv4_addr(ip_):
-                continue
-            if ip_type == 'local' and ip_.startswith('127.'):
-                return ip_
-            elif ip_type == 'private' and not salt.utils.cloud.is_public_ip(ip_):
-                return ip_
-            elif ip_type == 'public' and salt.utils.cloud.is_public_ip(ip_):
-                return ip_
-    return None
+    def __init__(self, tgt, indexed_minion, info, roster_order):
+        '''
+        Add provider, profile, and instance data to self
+        '''
+        self.provider = indexed_minion.get('provider', None)
+        self.profile = indexed_minion.get('profile', None)
+        self.driver = indexed_minion.get('driver', None)
+        self.vm_ = {
+            'provider': self.provider,
+            'profile': self.profile,
+        }
+
+        self.full_info = info.get(self.provider, {}).get(self.driver, {}).get(tgt, {})
+        self.cloud_opts = salt.config.cloud_config('/etc/salt/cloud')
+        self.roster_order = roster_order
+
+    def _normalize_list(self, arg):
+        '''
+        Return ``arg`` as a list of strings
+        '''
+        if isinstance(arg, (tuple, list)):
+            return [str(item) for item in arg]
+        else:
+            return [str(arg)]
+
+    def _extract_ipv4(self, ipv4):
+        '''
+        Extract the preferred IP address from the ipv4 grain
+        '''
+        for ip_type in self.roster_order:
+            for ip_ in ipv4:
+                if ':' in ip_:
+                    continue
+                if not salt.utils.validate.net.ipv4_addr(ip_):
+                    continue
+                if ip_type == 'local' and ip_.startswith('127.'):
+                    return ip_
+                elif ip_type == 'private' and not salt.utils.cloud.is_public_ip(ip_):
+                    return ip_
+                elif ip_type == 'public' and salt.utils.cloud.is_public_ip(ip_):
+                    return ip_
+        return None
+
+    @property
+    def host(self):
+        '''
+        Add IPv4 address to roster config
+        '''
+        # Amazon EC2
+        if self.driver == 'ec2':
+            public_ips = self._normalize_list(
+                self.full_info.get('public_ips', [])
+            )
+            private_ips = self._normalize_list(
+                self.full_info.get('private_ips', [])
+            )
+            ip_list = public_ips + private_ips
+        # Digital Ocean
+        elif self.driver == 'digital_ocean':
+            nets = self.full_info.get('networks', {}).get('v4', [])
+            ip_list = [net.get('ip_address', '') for net in nets]
+        else:
+            raise SaltRenderError('{0} provider not yet supported by cloud roster'.format(self.provider))
+
+        return self._extract_ipv4(ip_list)
+
+    @property
+    def user(self):
+        '''
+        Add SSH user name to roster config
+        '''
+        ssh_username = salt.utils.cloud.ssh_usernames({}, self.cloud_opts)
+        if isinstance(ssh_username, string_types):
+            return ssh_username
+        elif isinstance(ssh_username, list):
+            return ssh_username[0]
+
+    @property
+    def password(self):
+        '''
+        Add password to roster config
+        '''
+        return salt.config.get_cloud_config_value(
+            'password', self.vm_, self.cloud_opts, search_global=False, default=None
+        )
+
+    @property
+    def priv(self):
+        '''
+        Add secret key to roster config
+        '''
+        private_key = salt.config.get_cloud_config_value(
+            'private_key', self.vm_, self.cloud_opts, search_global=False, default=None
+        )
+        ssh_key_file = salt.config.get_cloud_config_value(
+            'ssh_key_file', self.vm_, self.cloud_opts, search_global=False, default=None
+        )
+        if private_key:
+            return private_key
+        elif ssh_key_file:
+            return ssh_key_file
+
+    @property
+    def sudo(self):
+        '''
+        Add sudo to roster config
+        '''
+        return salt.config.get_cloud_config_value(
+            'sudo', self.vm_, self.cloud_opts, search_global=False, default=None
+        )
+
+    @property
+    def tty(self):
+        '''
+        Add tty to roster config
+        '''
+        return salt.config.get_cloud_config_value(
+            'tty', self.vm_, self.cloud_opts, search_global=False, default=None
+        )
