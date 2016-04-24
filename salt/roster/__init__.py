@@ -5,14 +5,17 @@ hit from the master rather than acting as an independent entity. This covers
 hitting minions without zeromq in place via an ssh agent, and connecting to
 systems that cannot or should not host a minion agent.
 '''
+# Import python libs
 from __future__ import absolute_import
+import os
+import logging
 
 # Import salt libs
 import salt.loader
 import salt.syspaths
+from salt.exceptions import SaltRenderError, NotImplemented
 
-import os
-import logging
+# Import 3rd party libs
 from salt.ext.six import string_types
 
 log = logging.getLogger(__name__)
@@ -77,7 +80,7 @@ class Roster(object):
                 continue
             try:
                 targets.update(self.rosters[f_str](tgt, tgt_type))
-            except salt.exceptions.SaltRenderError as exc:
+            except (SaltRenderError, NotImplemented) as exc:
                 log.error('Unable to render roster file: {0}'.format(exc))
             except IOError as exc:
                 pass
