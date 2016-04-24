@@ -76,7 +76,7 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     '''
     Return the targets from the cloud cache
     '''
-    ret = {'tgt': {}}
+    ret = {tgt: {}}
 
     # Cloud cache index
     cache = os.path.join(syspaths.CACHE_DIR, 'cloud', 'index.p')
@@ -106,31 +106,31 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
 
     # IPv4 address
     if roster_opts.host:
-        ret['tgt']['host'] = roster_opts.host
+        ret[tgt]['host'] = roster_opts.host
     else:
         raise SaltRenderError('Could not find IPv4 address for {0}'.format(tgt))
 
     # ssh user name
     if roster_opts.user:
-        ret['tgt']['user'] = roster_opts.user
+        ret[tgt]['user'] = roster_opts.user
     else:
         raise SaltRenderError('Could not find ssh user for {0}'.format(tgt))
 
     # ssh secret key file or password
     if roster_opts.priv:
-        ret['tgt']['priv'] = roster_opts.priv
+        ret[tgt]['priv'] = roster_opts.priv
     elif roster_opts.password:
-        ret['tgt']['password'] = roster_opts.password
+        ret[tgt]['password'] = roster_opts.password
     else:
         raise SaltRenderError('Could not find ssh key or password for {0}'.format(tgt))
 
     # sudo
     if roster_opts.sudo:
-        ret['tgt']['sudo'] = roster_opts.sudo
+        ret[tgt]['sudo'] = roster_opts.sudo
 
     # tty
     if roster_opts.tty:
-        ret['tgt']['tty'] = roster_opts.tty
+        ret[tgt]['tty'] = roster_opts.tty
 
     return ret
 
