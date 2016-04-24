@@ -297,6 +297,12 @@ def create(vm_):
         transport=__opts__['transport']
     )
 
+    # Add VM to index cache. Mainly used by Salt SSH cloud roster
+    if __opts__.get('update_cachedir', False) is True:
+        salt.utils.cloud.cachedir_index_add(
+            vm_['name'], vm_['profile'], 'digital_ocean', vm_['driver']
+        )
+
     log.info('Creating Cloud VM {0}'.format(vm_['name']))
 
     kwargs = {

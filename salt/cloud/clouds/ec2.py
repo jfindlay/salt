@@ -2452,9 +2452,12 @@ def create(vm_=None, call=None):
         },
         transport=__opts__['transport']
     )
-    salt.utils.cloud.cachedir_index_add(
-        vm_['name'], vm_['profile'], 'ec2', vm_['driver']
-    )
+
+    # Add VM to index cache. Mainly used by Salt SSH cloud roster
+    if __opts__.get('update_cachedir', False) is True:
+        salt.utils.cloud.cachedir_index_add(
+            vm_['name'], vm_['profile'], 'ec2', vm_['driver']
+        )
 
     vm_['key_filename'] = key_filename
     # wait_for_instance requires private_key
