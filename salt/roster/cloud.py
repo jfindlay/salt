@@ -58,9 +58,6 @@ may override this ordering with the ``roster_order`` config in
 from __future__ import absolute_import
 import os.path
 
-# Import 3rd-party libs
-import msgpack
-
 # Import Salt libs
 import salt.loader
 import salt.utils
@@ -68,33 +65,38 @@ import salt.utils.cloud
 import salt.utils.validate.net
 import salt.config
 from salt import syspaths
+from salt.exceptions import SaltRenderError
+
+# Import 3rd-party libs
+import msgpack
 from salt.ext.six import string_types
 
 
 def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     '''
-    Return the targets from the flat yaml file, checks opts for location but
-    defaults to /etc/salt/roster
+    Return the targets from the cloud cache
     '''
-    ret = {}
+    ret = {'tgt': {}}
 
+    # Cloud cache index
     cache = os.path.join(syspaths.CACHE_DIR, 'cloud', 'index.p')
     if not os.path.exists(cache):
-        return {}
+        raise SaltRenderError('Cloud cache index file, {0}, does not exist'.format(cache))
 
     with salt.utils.fopen(cache, 'r') as fh_:
         cache_data = msgpack.load(fh_)
 
     indexed_minion = cache_data.get(tgt, None)
     if indexed_minion is None:
-        return {}
+        raise SaltRenderError('Could not find {0} in cloud cache'.format(tgt))
 
+    # Provider, profile, and instance information
     client = salt.cloud.CloudClient(
             os.path.join(os.path.dirname(__opts__['conf_file']), 'cloud')
             )
     info = client.action('show_instance', names=[tgt])
     if not info:
-        return {}
+        raise SaltRenderError('Could not find {0} instance information'.format(tgt))
 
     roster_order = __opts__.get('roster_order', (
         'public', 'private', 'local'
@@ -105,18 +107,22 @@ def targets(tgt, tgt_type='glob', **kwargs):  # pylint: disable=W0613
     # IPv4 address
     if roster_opts.host:
         ret['tgt']['host'] = roster_opts.host
+    else:
+        raise SaltRenderError('Could not find IPv4 address for {0}'.format(tgt))
 
     # ssh user name
     if roster_opts.user:
         ret['tgt']['user'] = roster_opts.user
+    else:
+        raise SaltRenderError('Could not find ssh user for {0}'.format(tgt))
 
-    # password
-    if roster_opts.password:
-        ret['tgt']['password'] = roster_opts.password
-
-    # ssh secret key file
+    # ssh secret key file or password
     if roster_opts.priv:
         ret['tgt']['priv'] = roster_opts.priv
+    elif roster_opts.password:
+        ret['tgt']['password'] = roster_opts.password
+    else:
+        raise SaltRenderError('Could not find ssh key or password for {0}'.format(tgt))
 
     # sudo
     if roster_opts.sudo:
