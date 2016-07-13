@@ -2494,7 +2494,7 @@ def recurse(name,
             # the same list.
             _filenames = list(filenames)
             for filename in _filenames:
-                if filename.startswith(lname):
+                if filename.startswith(lname + os.sep):
                     log.debug('** skipping file ** {0}, it intersects a '
                               'symlink'.format(filename))
                     filenames.remove(filename)
