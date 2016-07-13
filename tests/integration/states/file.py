@@ -768,6 +768,35 @@ class FileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
         finally:
             shutil.rmtree(name, ignore_errors=True)
 
+    def test_recurse_clean_keep_symlinks(self):
+        '''
+        file.recurse with clean=True and keep_symlinks=True
+        '''
+        # Setup temporary directory
+        name = os.path.join(integration.TMP, 'file_recurse_clean_symlinks')
+        if not os.path.isdir(name):
+            os.makedirs(name)
+        target = os.path.join(name, 'libxyz.so.1.2.3')
+
+        # Apply state
+        ret = self.run_state('file.recurse',
+                             name=name,
+                             source='salt://file_recurse_clean_symlinks',
+                             clean=True,
+                             keep_symlinks=True)
+
+        # Test for correct results
+        try:
+            self.assertSaltTrueReturn(ret)
+            self.assertTrue(os.path.isfile(target))
+            for fn in ('libxyz.so', 'libxyz.so.1', 'libxyz.so.1.2'):
+                path = os.path.join(name, fn)
+                self.assertTrue(os.path.islink(path))
+                self.assertEqual(os.path.realpath(path), target)
+        # Remove temporary directory
+        finally:
+            shutil.rmtree(name, ignore_errors=True)
+
     def test_replace(self):
         '''
         file.replace
