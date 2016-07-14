@@ -777,6 +777,7 @@ class FileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
         if not os.path.isdir(name):
             os.makedirs(name)
         target = os.path.join(name, 'libxyz.so.1.2.3')
+        links = ('libxyz.so', 'libxyz.so.1', 'libxyz.so.1.2')
 
         # Apply state
         ret = self.run_state('file.recurse',
@@ -789,8 +790,8 @@ class FileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
         try:
             self.assertSaltTrueReturn(ret)
             self.assertTrue(os.path.isfile(target))
-            for fn in ('libxyz.so', 'libxyz.so.1', 'libxyz.so.1.2'):
-                path = os.path.join(name, fn)
+            for link in links:
+                path = os.path.join(name, link)
                 self.assertTrue(os.path.islink(path))
                 self.assertEqual(os.path.realpath(path), target)
         # Remove temporary directory

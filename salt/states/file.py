@@ -2501,6 +2501,7 @@ def recurse(name,
             # Create the symlink along with the necessary dirs.
             # The dir perms/ownership will be adjusted later
             # if needed
+            print(os.path.join(name, srelpath), ltarget)
             _ret = symlink(os.path.join(name, srelpath),
                            ltarget,
                            makedirs=True,
