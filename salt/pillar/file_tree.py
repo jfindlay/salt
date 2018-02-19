@@ -360,6 +360,14 @@ def ext_pillar(minion_id,
     return result_pillar
 
 
+def _subtree_pillar(subtree):
+    '''
+    - all
+    - <nodegroup>
+    - host (minion_id)
+    '''
+
+
 def _ext_pillar(minion_id,
                 root_dir,
                 follow_dir_links,
@@ -389,7 +397,7 @@ def _ext_pillar(minion_id,
         )
         return {}
 
-    ngroup_pillar = {}
+    cumulative_pillar = {}  # Accumulate file_tree pillar data from various sources
     nodegroups_dir = os.path.join(root_dir, 'nodegroups')
     if os.path.exists(nodegroups_dir) and len(__opts__['nodegroups']) > 0:
         master_ngroups = __opts__['nodegroups']
@@ -406,7 +414,7 @@ def _ext_pillar(minion_id,
                     if minion_id in match:
                         ngroup_dir = os.path.join(
                             nodegroups_dir, six.text_type(nodegroup))
-                        ngroup_pillar = salt.utils.dictupdate.merge(ngroup_pillar,
+                        cumulative_pillar = salt.utils.dictupdate.merge(cumulative_pillar,
                             _construct_pillar(ngroup_dir,
                                               follow_dir_links,
                                               keep_newline,
@@ -429,11 +437,11 @@ def _ext_pillar(minion_id,
     host_dir = os.path.join(root_dir, 'hosts', minion_id)
     if not os.path.exists(host_dir):
         # No data for host with this ID
-        return ngroup_pillar
+        return cumulative_pillar
 
     if not os.path.isdir(host_dir):
         log.error('file_tree: %s exists, but is not a directory', host_dir)
-        return ngroup_pillar
+        return cumulative_pillar
 
     host_pillar = _construct_pillar(host_dir,
                                     follow_dir_links,
@@ -442,6 +450,6 @@ def _ext_pillar(minion_id,
                                     renderer_blacklist,
                                     renderer_whitelist,
                                     template)
-    return salt.utils.dictupdate.merge(ngroup_pillar,
+    return salt.utils.dictupdate.merge(cumulative_pillar,
                                        host_pillar,
                                        strategy='recurse')
