@@ -3,12 +3,12 @@
 This script is used to kick off a salt minion daemon
 '''
 
-import salt.utils.platform
 from salt.scripts import salt_minion
 from multiprocessing import freeze_support
 
 
 if __name__ == '__main__':
+    import salt.utils.platform
     if salt.utils.platform.is_windows():
         # Since this file does not have a '.py' extension, when running on
         # Windows, spawning any addional processes will fail due to Python

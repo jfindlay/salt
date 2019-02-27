@@ -21,6 +21,7 @@ from random import randint
 from salt.exceptions import SaltSystemExit, SaltClientError, SaltReqTimeoutError
 import salt.defaults.exitcodes  # pylint: disable=unused-import
 import salt.ext.six as six
+import salt.log.setup
 
 log = logging.getLogger(__name__)
 
