@@ -637,6 +637,9 @@ def _run(
     if "stdin_raw_newlines" in kwargs:
         new_kwargs["stdin_raw_newlines"] = kwargs["stdin_raw_newlines"]
 
+    if "return_binary" in kwargs:
+        new_kwargs["return_binary"] = kwargs["return_binary"]
+
     if umask is not None:
         _umask = six.text_type(umask).lstrip("0")
 
@@ -715,23 +718,24 @@ def _run(
                 output_encoding,
             )
 
-        try:
-            out = salt.utils.stringutils.to_unicode(
-                proc.stdout, encoding=output_encoding
-            )
-        except TypeError:
-            # stdout is None
-            out = ""
-        except UnicodeDecodeError:
-            out = salt.utils.stringutils.to_unicode(
-                proc.stdout, encoding=output_encoding, errors="replace"
-            )
-            if output_loglevel != "quiet":
-                log.error(
-                    "Failed to decode stdout from command %s, non-decodable "
-                    "characters have been replaced",
-                    cmd,
+        if not return_binary:
+            try:
+                out = salt.utils.stringutils.to_unicode(
+                    proc.stdout, encoding=output_encoding
                 )
+            except TypeError:
+                # stdout is None
+                out = ""
+            except UnicodeDecodeError:
+                out = salt.utils.stringutils.to_unicode(
+                    proc.stdout, encoding=output_encoding, errors="replace"
+                )
+                if output_loglevel != "quiet":
+                    log.error(
+                        "Failed to decode stdout from command %s, non-decodable "
+                        "characters have been replaced",
+                        cmd,
+                    )
 
         try:
             err = salt.utils.stringutils.to_unicode(
@@ -1136,6 +1140,16 @@ def run(
         present in the ``stdin`` value to newlines.
 
       .. versionadded:: 2019.2.0
+
+    :param bool return_binary: False
+        if ``True``, Salt will not attempt to decode ``stdout`` to unicode
+        data, but will instead return the raw data as a ``bytes`` string.
+
+        .. code-block:: sls
+
+            example_secret: '{{ __salt__['cmd.run']('gokey -p {} -r example.com'.format(example_pass), return_binary=True) }}'
+
+        .. versionadded:: Magnesium
 
     CLI Example:
 
