@@ -1087,7 +1087,7 @@ class SerializerExtension(Extension):
             try:
                 # Reported line is off by one, add 1 to correct it
                 line = exc.problem_mark.line + 1
-                buf = exc.problem_mark.buffer
+                buf = exc.problem_mark.buffer or value
                 problem = exc.problem
             except AttributeError:
                 # No context information available in the exception, fall back

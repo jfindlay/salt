@@ -63,7 +63,9 @@ def render(yaml_data, saltenv="base", sls="", argline="", **kws):
         except ScannerError as exc:
             err_type = _ERROR_MAP.get(exc.problem, exc.problem)
             line_num = exc.problem_mark.line + 1
-            raise SaltRenderError(err_type, line_num, exc.problem_mark.buffer)
+            raise SaltRenderError(
+                err_type, line_num, exc.problem_mark.buffer or yaml_data
+            )
         except (ParserError, ConstructorError) as exc:
             raise SaltRenderError(exc)
         if len(warn_list) > 0:
