@@ -1046,6 +1046,9 @@
 # can be utilized. Available options are the same as ``pillar_cache_backend``.
 #gpg_cache_backend: disk
 
+# Raise an exception if GPG decryption fails
+#gpg_decrypt_must_succeed: False
+
 
 ######        Reactor Settings        #####
 ###########################################

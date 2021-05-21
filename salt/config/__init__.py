@@ -599,6 +599,8 @@ VALID_OPTS = immutabletypes.freeze(
         "gpg_cache_ttl": int,
         # GPG data cache backend. Defaults to `disk` which stores caches in the master cache
         "gpg_cache_backend": str,
+        # Raise an exception if GPG decryption fails
+        "gpg_decrypt_must_succeed": str,
         "pillar_safe_render_error": bool,
         # When creating a pillar, there are several strategies to choose from when
         # encountering duplicate values
@@ -1009,14 +1011,16 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "pillar_merge_lists": False,
         "pillar_includes_override_sls": False,
         # ``pillar_cache``, ``pillar_cache_ttl``, ``pillar_cache_backend``,
-        # ``gpg_cache``, ``gpg_cache_ttl`` and ``gpg_cache_backend``
-        # are not used on the minion but are unavoidably in the code path
+        # ``gpg_cache``, ``gpg_cache_ttl``, ``gpg_cache_backend``, and
+        # ``gpg_decrypt_must_succeed`` are not used on the minion but are
+        # unavoidably in the code path
         "pillar_cache": False,
         "pillar_cache_ttl": 3600,
         "pillar_cache_backend": "disk",
         "gpg_cache": False,
         "gpg_cache_ttl": 86400,
         "gpg_cache_backend": "disk",
+        "gpg_decrypt_must_succeed": False,
         "extension_modules": os.path.join(salt.syspaths.CACHE_DIR, "minion", "extmods"),
         "state_top": "top.sls",
         "state_top_saltenv": None,
@@ -1384,6 +1388,7 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "gpg_cache": False,
         "gpg_cache_ttl": 86400,
         "gpg_cache_backend": "disk",
+        "gpg_decrypt_must_succeed": False,
         "ping_on_rotate": False,
         "peer": {},
         "preserve_minion_cache": False,

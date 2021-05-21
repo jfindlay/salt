@@ -4856,6 +4856,18 @@ can be utilized:
 
     pillar_cache_backend: disk
 
+GPG Pillar Options
+------------------
+
+``gpg_decrypt_must_succeed``
+****************************
+
+.. versionadded:: silicon
+
+Default: ``False``
+
+If GPG decryption fails for any secret in pillar, setting this flag to ``True``
+will raise a ``SaltRenderError``.
 
 Master Reactor Settings
 =======================

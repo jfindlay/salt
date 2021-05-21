@@ -267,6 +267,17 @@ pillar data like so:
 .. code-block:: bash
 
     salt myminion state.sls secretstuff pillar_enc=gpg pillar="$ciphertext"
+
+Configuration
+*************
+
+The default behaviour of this renderer is to log a warning if a block could not
+be decrypted; in other words, it just returns the ciphertext rather than the
+encrypted secret.
+
+This behaviour can be changed via the ``gpg_decrypt_must_succeed``
+configuration option.  If set to true, any gpg block that cannot be decrypted
+raises an exception failing the render.
 """
 
 
@@ -364,7 +375,10 @@ def _decrypt_ciphertext(cipher):
     proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=False)
     decrypted_data, decrypt_error = proc.communicate(input=cipher)
     if not decrypted_data:
-        log.warning("Could not decrypt cipher %r, received: %r", cipher, decrypt_error)
+        message = "Could not decrypt cipher {!r}, received: {!r}".format(cipher, decrypt_error)
+        log.warning(message)
+        if __opts__.get("gpg_decrypt_must_succeed", False):
+            raise SaltRenderError(message)
         return cipher
     else:
         if __opts__.get("gpg_cache"):
