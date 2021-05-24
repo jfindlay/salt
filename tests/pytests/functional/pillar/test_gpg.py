@@ -123,6 +123,25 @@ secrets:
         -----END PGP MESSAGE-----
 """
 
+GPG_PILLAR_YAML_BAD = """\
+secrets:
+  vault:
+    foo: |
+      -----BEGIN PGP MESSAGE-----
+
+      VunVrqa4/X8t6VqurunrVcSebesZq4thhQEhSw28h7bH/n4QASEVhTuN8bizu8HV
+      unuZqhaeX88AE4tluthzhShh8zZXZihh4EMtt8BB7XbRaqXEngqMTMXBn8gniuX8
+      z86MEM/lns4hUursuR84X8biEuE4/UnhSw2tThVSh8qSt/bzl7gl8XuRsahtwSVX
+      RhuBT2gUU8aa/2uh6Tbge8uzSe87XhwESABeEnR48/huu/hihHwQAuTNEV2Tnht8
+      hVgeu6XuNZznhhl8EluTqZu84MX/wctZBnhA8MbwUZQBEehEhtAV287Vs8SswZXq
+      Z48AZ7/4EVaRZewhZQtNZVTqu8inUQz8hANHwsiuNe/BrughURiAuah6QeVeqqu/
+      hVgA/6hhXb86Q4hn8VtEEAaqhSZSXuQVuatVNXUhVtun/eQgeNnVV8VcuSQBEn/V
+      sMEhSNneeq==
+      =8rQ8
+      -----END PGP MESSAGE-----
+    bar: Does rot32ing an encrypted base64 message make it more secure?
+"""
+
 GPG_PILLAR_ENCRYPTED = {
     "secrets": {
         "vault": {
@@ -182,8 +201,7 @@ GPG_PILLAR_DECRYPTED = {
 }
 
 
-@pytest.fixture(scope="package", autouse=True)
-def gpg_homedir(salt_master, pillar_state_tree):
+def gpg_homedir(salt_master, pillar_state_tree, gpg_pillar_yaml):
     _gpg_homedir = pathlib.Path(salt_master.config_dir) / "gpgkeys"
     _gpg_homedir.mkdir(0o700)
     agent_started = False
@@ -232,7 +250,7 @@ def gpg_homedir(salt_master, pillar_state_tree):
         """
         with pytest.helpers.temp_file(
             "top.sls", top_file_contents, pillar_state_tree
-        ), pytest.helpers.temp_file("gpg.sls", GPG_PILLAR_YAML, pillar_state_tree):
+        ), pytest.helpers.temp_file("gpg.sls", gpg_pillar_yaml, pillar_state_tree):
             yield _gpg_homedir
     finally:
         if agent_started:
@@ -258,7 +276,23 @@ def gpg_homedir(salt_master, pillar_state_tree):
         shutil.rmtree(str(_gpg_homedir), ignore_errors=True)
 
 
-def test_decrypt_pillar_default_renderer(salt_master, grains):
+@pytest.fixture(scope="package")
+def gpg_setup(salt_master, pillar_state_tree):
+    """
+    Setup GPG for pillar tests
+    """
+    return gpg_homedir(salt_master, pillar_state_tree, GPG_PILLAR_YAML)
+
+
+@pytest.fixture(scope="package")
+def gpg_setup_bad_encrypted_block(salt_master, pillar_state_tree):
+    """
+    Setup GPG for pillar tests with a bad encryption block
+    """
+    return gpg_homedir(salt_master, pillar_state_tree, GPG_PILLAR_YAML_BAD)
+
+
+def test_decrypt_pillar_default_renderer(salt_master, grains, gpg_setup):
     """
     Test recursive decryption of secrets:vault as well as the fallback to
     default decryption renderer.
@@ -271,7 +305,7 @@ def test_decrypt_pillar_default_renderer(salt_master, grains):
 
 
 @pytest.mark.slow_test
-def test_decrypt_pillar_alternate_delimiter(salt_master, grains):
+def test_decrypt_pillar_alternate_delimiter(salt_master, grains, gpg_setup):
     """
     Test recursive decryption of secrets:vault using a pipe instead of a
     colon as the nesting delimiter.
@@ -288,7 +322,7 @@ def test_decrypt_pillar_alternate_delimiter(salt_master, grains):
     assert ret == GPG_PILLAR_DECRYPTED
 
 
-def test_decrypt_pillar_deeper_nesting(salt_master, grains):
+def test_decrypt_pillar_deeper_nesting(salt_master, grains, gpg_setup):
     """
     Test recursive decryption, only with a more deeply-nested target. This
     should leave the other keys in secrets:vault encrypted.
@@ -307,7 +341,7 @@ def test_decrypt_pillar_deeper_nesting(salt_master, grains):
     assert ret == expected
 
 
-def test_decrypt_pillar_explicit_renderer(salt_master, grains):
+def test_decrypt_pillar_explicit_renderer(salt_master, grains, gpg_setup):
     """
     Test recursive decryption of secrets:vault, with the renderer
     explicitly defined, overriding the default. Setting the default to a
@@ -329,7 +363,7 @@ def test_decrypt_pillar_explicit_renderer(salt_master, grains):
     assert ret == GPG_PILLAR_DECRYPTED
 
 
-def test_decrypt_pillar_missing_renderer(salt_master, grains):
+def test_decrypt_pillar_missing_renderer(salt_master, grains, gpg_setup):
     """
     Test decryption using a missing renderer. It should fail, leaving the
     encrypted keys intact, and add an error to the pillar dictionary.
@@ -357,7 +391,7 @@ def test_decrypt_pillar_missing_renderer(salt_master, grains):
     assert ret["secrets"]["vault"]["qux"] == expected["secrets"]["vault"]["qux"]
 
 
-def test_decrypt_pillar_invalid_renderer(salt_master, grains):
+def test_decrypt_pillar_invalid_renderer(salt_master, grains, gpg_setup):
     """
     Test decryption using a renderer which is not permitted. It should
     fail, leaving the encrypted keys intact, and add an error to the pillar
@@ -386,3 +420,17 @@ def test_decrypt_pillar_invalid_renderer(salt_master, grains):
     assert ret["secrets"]["vault"]["bar"] == expected["secrets"]["vault"]["bar"]
     assert ret["secrets"]["vault"]["baz"] == expected["secrets"]["vault"]["baz"]
     assert ret["secrets"]["vault"]["qux"] == expected["secrets"]["vault"]["qux"]
+
+
+def test_decrypt_pillar_fail(salt_master, grains, gpg_setup_bad_encrypted_block):
+    """
+    Test ``SaltRenderError`` is raised when decryption fails.
+    """
+    opts = salt_master.config.copy()
+    opts["gpg_decrypt_must_succeed"] = True
+    pillar_obj = salt.pillar.Pillar(opts, grains, "test", "base")
+    ret = pillar_obj.compile_pillar()
+    expected["_errors"] = [
+        "Could not decrypt cipher <place hold>, received: <hold another>"
+    ]
+    assert ret["_errors"] == expected["_errors"]
