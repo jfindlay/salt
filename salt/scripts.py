@@ -204,6 +204,13 @@ def salt_minion():
     # keep one minion subprocess running
     prev_sigint_handler = signal.getsignal(signal.SIGINT)
     prev_sigterm_handler = signal.getsignal(signal.SIGTERM)
+
+    # Make sure to gracefully handle SIGUSR1,2
+    import salt.utils.debug
+
+    salt.utils.debug.enable_sigusr1_handler()
+    salt.utils.debug.enable_sigusr2_handler()
+
     while True:
         try:
             process = multiprocessing.Process(
@@ -346,6 +353,12 @@ def salt_proxy():
         proxyminion.start()
         return
 
+    # Make sure to gracefully handle SIGUSR1,2
+    import salt.utils.debug
+
+    salt.utils.debug.enable_sigusr1_handler()
+    salt.utils.debug.enable_sigusr2_handler()
+
     # keep one minion subprocess running
     while True:
         try:
@@ -390,6 +403,12 @@ def salt_syndic():
     import salt.utils.process
 
     salt.utils.process.notify_systemd()
+
+    # Make sure to gracefully handle SIGUSR1,2
+    import salt.utils.debug
+
+    salt.utils.debug.enable_sigusr1_handler()
+    salt.utils.debug.enable_sigusr2_handler()
 
     import salt.cli.daemons
 

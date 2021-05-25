@@ -3130,9 +3130,6 @@ class Minion(MinionBase):
             self._fire_master_minion_start()
             log.info("Minion is ready to receive requests!")
 
-        # Make sure to gracefully handle SIGUSR1
-        enable_sigusr1_handler()
-
         # Make sure to gracefully handle CTRL_LOGOFF_EVENT
         if HAS_WIN_FUNCTIONS:
             salt.utils.win_functions.enable_ctrl_logoff_handler()
@@ -3698,9 +3695,6 @@ class SyndicManager(MinionBase):
             self.opts["syndic_event_forward_timeout"] * 1000,
         )
         self.forward_events.start()
-
-        # Make sure to gracefully handle SIGUSR1
-        enable_sigusr1_handler()
 
         self.io_loop.start()
 
