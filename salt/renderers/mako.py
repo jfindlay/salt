@@ -29,7 +29,7 @@ def render(template_file, saltenv="base", sls="", context=None, tmplpath=None, *
         salt=__salt__,
         grains=__grains__,
         opts=__opts__,
-        pillar=__pillar__,
+        pillar=kws.pop("pillar", __pillar__),
         saltenv=saltenv,
         sls=sls,
         context=context,
