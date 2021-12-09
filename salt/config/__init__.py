@@ -7,6 +7,7 @@ import glob
 import logging
 import os
 import re
+import secrets
 import sys
 import time
 import types
@@ -36,8 +37,8 @@ from salt._logging import (
     DFLT_LOG_DATEFMT_LOGFILE,
     DFLT_LOG_FMT_CONSOLE,
     DFLT_LOG_FMT_JID,
-    DFLT_LOG_FMT_MINION_ID,
     DFLT_LOG_FMT_LOGFILE,
+    DFLT_LOG_FMT_MINION_ID,
 )
 
 try:
@@ -179,6 +180,30 @@ VALID_OPTS = immutabletypes.freeze(
         # 'maint': Runs on a schedule as a part of the maintenance process.
         # '': Disable the key cache [default]
         "key_cache": str,
+        # Log requests arriving at the master `ReqServer` and the corresponding
+        # responses to a separate audit log file
+        "audit_log": bool,
+        # Audit log level
+        "audit_log_level": str,
+        # Log audit events to this file
+        "audit_log_file": str,
+        # Format string for the audit log
+        "audit_log_fmt": str,
+        # Key used for hashing secret fields with HMAC
+        "audit_log_hmac_key": str,
+        # Exclude requests containing these commands and also exclude their
+        # corresponding responses
+        "audit_log_exclude_cmds": list,
+        # Exclude these fields from the request load per command
+        "audit_log_exclude_req_fields": dict,
+        # Exclude the data returned for these return keys
+        "audit_log_exclude_ret_data": list,
+        # Exclude these fields from the return data
+        "audit_log_exclude_ret_fields": list,
+        # HMAC these known secret fields in the request load per command
+        "audit_log_hash_req_fields": dict,
+        # HMAC return data when return `key` is in this list
+        "audit_log_hash_ret_data": list,
         # The user under which the daemon should run
         "user": str,
         # The root directory prepended to these options: pki_dir, cachedir,
@@ -1345,6 +1370,17 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "zmq_backlog": 1000,
         "pub_hwm": 1000,
         "auth_mode": 1,
+        "audit_log": False,
+        "audit_log_level": "info",
+        "audit_log_file": os.path.join(salt.syspaths.LOGS_DIR, "master_audit"),
+        "audit_log_fmt": "json",
+        "audit_log_hmac_key": secrets.token_urlsafe(64),
+        "audit_log_exclude_cmds": [],
+        "audit_log_exclude_req_fields": {},
+        "audit_log_exclude_ret_data": [],
+        "audit_log_exclude_ret_fields": [],
+        "audit_log_hash_req_fields": {},
+        "audit_log_hash_ret_data": [],
         "user": _MASTER_USER,
         "worker_threads": 5,
         "sock_dir": os.path.join(salt.syspaths.SOCK_DIR, "master"),

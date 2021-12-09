@@ -8,6 +8,7 @@
 import logging
 import logging.handlers
 import sys
+import traceback
 from collections import deque
 
 from salt._logging.mixins import ExcInfoOnLogLevelFormatMixin
@@ -164,3 +165,29 @@ class WatchedFileHandler(
     """
     Watched file handler which properly handles exc_info on a per handler basis
     """
+
+
+class AuditFileHandler(WatchedFileHandler):
+    """
+    Setup file handler for audit log
+    """
+
+    def handleError(self, record):
+        """
+        Override parent method to prevent `record.msg` from being written to stdout/stderr.
+
+        See https://github.com/python/cpython/blob/3.8/Lib/logging/__init__.py#L991
+        """
+        if logging.raiseExceptions and sys.stderr:
+            t, v, tb = sys.exc_info()
+            try:
+                sys.stderr.write("--- Audit log error ---\n")
+                traceback.print_exception(t, v, tb, None, sys.stderr)
+                sys.stderr.write(
+                    "Error while logging from file %s, line %s\n"
+                    % (record.filename, record.lineno)
+                )
+            except OSError:
+                pass
+            finally:
+                del t, v, tb

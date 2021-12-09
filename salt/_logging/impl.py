@@ -27,11 +27,13 @@ QUIET = logging.QUIET = 1000
 import salt.defaults.exitcodes  # isort:skip  pylint: disable=unused-import
 import salt.utils.ctx
 
+from salt._logging.formatters import AuditFormatter  # isort:skip
 from salt._logging.handlers import DeferredStreamHandler  # isort:skip
 from salt._logging.handlers import RotatingFileHandler  # isort:skip
 from salt._logging.handlers import StreamHandler  # isort:skip
 from salt._logging.handlers import SysLogHandler  # isort:skip
 from salt._logging.handlers import WatchedFileHandler  # isort:skip
+from salt._logging.handlers import AuditFileHandler  # isort:skip
 from salt._logging.mixins import LoggingMixinMeta  # isort:skip
 from salt.exceptions import LoggingRuntimeError  # isort:skip
 from salt.utils.immutabletypes import freeze, ImmutableDict  # isort:skip
@@ -856,6 +858,104 @@ def setup_logfile_handler(
     setup_logfile_handler.__handler__ = handler
 
 
+def get_audit_handler():
+    """
+    Get the audit handler
+    """
+    try:
+        return setup_audit_logger.__handler__
+    except AttributeError:
+        return
+
+
+def get_audit_logger():
+    """
+    Get the audit logger
+    """
+    try:
+        return setup_audit_logger.__logger__
+    except AttributeError:
+        return
+
+
+def is_audit_logger_configured():
+    """
+    Is the audit logger configured
+    """
+    return get_audit_handler() is not None and get_audit_logger() is not None
+
+
+def shutdown_audit_handler():
+    """
+    Only shutdown the audit handler as is done for the other custom handlers
+    defined here and let python handle the custom logger shutdown, if any
+    """
+    audit_handler = get_audit_handler()
+    audit_logger = get_audit_logger()
+    if audit_handler is not None and audit_logger is not None:
+        audit_logger.removeHandler(audit_handler)
+        audit_handler.close()
+        setup_audit_logger.__handler__ = None
+        atexit.unregister(shutdown_audit_handler)
+
+
+def setup_audit_logger(log_path, log_level, log_format, date_format, user):
+    """
+    Setup logging for audit events
+    """
+    if is_audit_logger_configured():
+        log.warning("Audit logging already configured")
+        return
+
+    atexit.register(shutdown_audit_handler)
+    log.trace(
+        "Setting up audit logging: %s",
+        dict(
+            log_path=log_path,
+            log_level=log_level,
+            log_format=log_format,
+            date_format=date_format,
+            user=user,
+        ),
+    )
+
+    # Setup options
+    log_level = get_logging_level_from_string(log_level)
+
+    # Setup audit log formatter
+    if log_format == "json":
+        formatter = AuditFormatter("%(message)s", datefmt=date_format)
+    else:
+        formatter = logging.Formatter(log_format, datefmt=date_format)
+
+    # Setup audit log handler
+    import salt.utils.files
+    import salt.utils.verify
+
+    with salt.utils.files.set_umask(0o027):
+        salt.utils.verify.verify_log_files([log_path], user)
+    try:
+        handler = AuditFileHandler(log_path)
+    except OSError:
+        log.warning(
+            "Failed to open audit log file, do you have permission to write to %s?",
+            log_path,
+        )
+        return
+
+    handler.setFormatter(formatter)
+
+    # Setup audit logger
+    logger = logging.getLogger("audit")
+    logger.propagate = False  # Do not send audit messages to upstream loggers
+    logger.setLevel(log_level)
+    logger.addHandler(handler)
+
+    # Store handler and logger in this function's namespace
+    setup_audit_logger.__handler__ = handler
+    setup_audit_logger.__logger__ = logger
+
+
 def get_extended_logging_handlers():
     """
     Get the extended logging handlers
@@ -996,6 +1096,14 @@ def setup_logging():
             )
         else:
             setup_logfile_handler.__handler__ = logging.NullHandler()
+    if opts.get("audit_log") and not is_audit_logger_configured():
+        setup_audit_logger(
+            log_path=opts["audit_log_file"],
+            log_level=opts["audit_log_level"],
+            log_format=opts["audit_log_fmt"],
+            date_format=opts["log_datefmt"],
+            user=opts["user"],
+        )
     if (
         opts.get("configure_ext_handlers", True)
         and not is_extended_logging_configured()
@@ -1017,6 +1125,8 @@ def shutdown_logging():
         shutdown_logfile_handler()
     if is_console_handler_configured():
         shutdown_console_handler()
+    if is_audit_logger_configured():
+        shutdown_audit_handler()
 
 
 def in_mainprocess():

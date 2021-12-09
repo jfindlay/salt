@@ -1240,6 +1240,33 @@
 #
 #log_granular_levels: {}
 
+# Audit logging
+# #############
+# Log requests arriving at the master `ReqServer` and the corresponding
+# responses to a separate audit log file
+#audit_log: False
+# Audit log level
+#audit_log_level: info
+# Log audit events to this file
+#audit_log_file: /var/log/salt/master_audit
+# Format string for the audit log
+#audit_log_fmt: json
+# Key used for hashing secret fields with HMAC
+#audit_log_hmac_key: # Defaults to 64 random base64 chars
+# Exclude requests containing these commands and also exclude their
+# corresponding responses
+#audit_log_exclude_cmds: []
+# Exclude these fields from the request load per command
+#audit_log_exclude_req_fields: {}
+# Exclude the data returned for these return keys
+#audit_log_exclude_ret_data: []
+# Exclude these fields from the return data
+#audit_log_exclude_ret_fields: []
+# HMAC these known secret fields in the request load per command
+#audit_log_hash_req_fields: {}
+# HMAC return data when return `key` is in this list
+#audit_log_hash_ret_data: []
+
 
 #####         Node Groups           ######
 ##########################################

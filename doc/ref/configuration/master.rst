@@ -5707,6 +5707,205 @@ manage log files.
 :conf_log:`log_rotate_backup_count`
 
 
+.. conf_master:: audit_log
+
+``audit_log``
+-------------
+
+Default: ``False``
+
+Log requests arriving at the master ``ReqServer`` and their corresponding
+returns.
+
+
+.. conf_master:: audit_log_level
+
+``audit_log_level``
+------------------
+
+Default: ``info``
+
+Log level of :conf_master:`audit_log`.
+
+
+.. conf_master:: audit_log_file
+
+``audit_log_file``
+------------------
+
+Default: ``/var/log/salt/master_audit``
+
+Location of :conf_master:`audit_log`.
+
+
+.. conf_master:: audit_log_fmt
+
+``audit_log_fmt``
+-----------------
+
+Default: ``json``
+
+The :conf_master:`audit_log` file message format.  Accepts standard logging
+formatter strings.  If set to ``json``, log records will be json formatted as
+
+.. code-block:: json
+
+    {
+        "date": "<timestamp>",
+        "level": "<levelname>",
+        "message": {
+            "audit_id": "<audit ID>",
+            "host": "<hostname>",
+            "master": "<salt master ID>",
+            "request|response": "<request|response data>"
+    }
+
+The ``audit_id`` field is used to coordinate corresponding ``request`` and
+``return`` messages.
+
+If ``audit_log_fmt`` is not set to ``json``, the log format resembles a typical
+python logger log record, where the fields are specified by this string.  See
+:conf_log:`log_fmt_logfile` on how to format the log records in this case.
+Note that ``%(message)s`` will contain the same data and structure as shown in
+the json block above.
+
+
+.. conf_master:: audit_log_hmac_key
+
+``audit_log_hmac_key``
+----------------------
+
+Default: 64 random base64 chars
+
+The key used for HMAC hashing of sensitive fields in the :conf_master:`audit
+log`.  Specifying which fields will be hashed in requests and returns is done
+by the various ``audit_log_hash_*`` config options below.
+
+
+.. conf_master:: audit_log_exclude_cmds
+
+``audit_log_exclude_cmds``
+--------------------------
+
+Default: ``[]``
+
+Exclude from the :conf_master:`audit_log` requests having a ``cmd`` in this
+list.  Also excludes corresponding returns.  For example, to exclude minion
+event requests and their returns:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_exclude_cmds:
+      - _minion_event
+
+
+.. conf_master:: audit_log_exclude_req_fields
+
+``audit_log_exclude_req_fields``
+--------------------------------
+
+Default: ``{}``
+
+Exclude from the :conf_master:`audit_log` these fields from the request
+``load``.  Filter rules are organized by ``cmd`` much like the ``top.sls``
+file.  Unlike the top file cmds may either be only the literal cmd name or
+``'*'``.  For example, to exclude ``grains`` data  from ``_pillar`` requests
+and ``return`` data in ``_return`` requests:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_exclude_req_fields:
+      _pillar:
+        - grains
+      _return:
+        - return
+
+
+.. conf_master:: audit_log_exclude_ret_data
+
+``audit_log_exclude_ret_data``
+------------------------------
+
+Default: ``[]``
+
+Exclude from the :conf_master:`audit_log` the data returned when the return
+``key`` is in this list.  For example, to exclude pillar data from the audit
+log:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_exclude_ret_data:
+      - pillar
+
+
+.. conf_master:: audit_log_exclude_ret_fields
+
+``audit_log_exclude_ret_fields``
+------------------------------
+
+Default: ``[]``
+
+Exclude from the :conf_master:`audit_log` these fields from the return data.
+For example, to exclude salt's crypto token from the audit log:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_exclude_ret_fields:
+      - tok
+
+
+.. conf_master:: audit_log_hash_req_fields
+
+``audit_log_hash_req_fields``
+-----------------------------
+
+Default: ``{}``
+
+Cryptographically hash these fields from the request ``load`` in the
+:conf_master:`audit_log`.  Hash rules are organized by ``cmd`` patterns much
+like the ``top.sls`` file.  Unlike the top file cmds may either be only the
+literal cmd name or ``'*'``.  Fields can also be matched by name or by ``'*'``.
+If ``'*'`` is used for field names, the ``cmd`` field will be exempted from
+hashing.  For example, to hash the ``key`` and ``tok`` fields in every request,
+every field except for ``cmd`` in ``__pillar`` requests, and ``id`` in
+``_return`` requests:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_hash_req_fields:
+      '*':
+        - key
+        - tok
+      _pillar:
+        - '*'
+      _return:
+        - id
+
+
+.. conf_master:: audit_log_hash_ret_data
+
+``audit_log_hash_ret_data``
+--------------------------
+
+Default: ``[]``
+
+Cryptographically hash the returned data from the return in the
+:conf_master:`audit_log`.  Entries in the list correspond to values for the
+``key`` field in the return.  For example, to hash the returned data for a
+``pillar`` return:
+
+.. code-block:: sls
+
+    audit_log: true
+    audit_log_hash_ret_data:
+      - pillar
+
+
 .. _node-groups:
 
 Node Groups

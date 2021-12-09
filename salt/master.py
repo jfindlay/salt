@@ -20,6 +20,7 @@ import time
 import tornado.gen
 
 import salt.acl
+import salt.audit
 import salt.auth
 import salt.channel.server
 import salt.client
@@ -1118,6 +1119,8 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
         super().__init__(**kwargs)
         self.opts = opts
         self.req_channels = req_channels
+        if opts["audit_log"]:
+            self.audit = salt.audit.Audit(opts)
 
         self.mkey = mkey
         self.key = key
@@ -1193,12 +1196,23 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
 
         :param dict payload: The payload route to the appropriate handler
         """
+        # Audit log request payload coming into master
+        audit_log_id = None
+        if self.opts["audit_log"]:
+            audit_log_id = self.audit.audit_req(payload)
+
         key = payload["enc"]
         load = payload["load"]
+
         if key == "clear":
             ret = await self._handle_clear(load)
         else:
             ret = self._handle_aes(load)
+
+        # Audit log response return before sending it back
+        if self.opts["audit_log"] and audit_log_id:
+            self.audit.audit_ret(ret, audit_log_id)
+
         return ret
 
     def _post_stats(self, start, cmd):
