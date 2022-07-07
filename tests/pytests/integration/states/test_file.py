@@ -395,6 +395,204 @@ def test_issue_50221(
         assert target_path.read_text().replace("\r\n", "\n") == expected_content
 
 
+@pytest.mark.skip_if_not_root
+@pytest.mark.usefixtures("pillar_tree")
+def test_issue_60426(
+    salt_master,
+    salt_call_cli,
+    tmp_path,
+    salt_minion,
+):
+    target_path = tmp_path / "/etc/foo/bar"
+    jinja_name = "foo_bar"
+    jinja_contents = (
+        "{% for item in accumulator['accumulated configstuff'] %}{{ item }}{% endfor %}"
+    )
+
+    sls_name = "issue-60426"
+    sls_contents = """
+    configuration file:
+      file.managed:
+        - name: {target_path}
+        - source: salt://foo_bar.jinja
+        - template: jinja
+        - makedirs: True
+
+    accumulated configstuff:
+      file.accumulated:
+        - filename: {target_path}
+        - text:
+          - some
+          - good
+          - stuff
+        - watch_in:
+          - configuration file
+    """.format(
+        target_path=target_path
+    )
+
+    sls_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.sls".format(sls_name), sls_contents
+    )
+
+    jinja_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.jinja".format(jinja_name), jinja_contents
+    )
+
+    with sls_tempfile, jinja_tempfile:
+        ret = salt_call_cli.run("state.apply", sls_name)
+        assert ret.returncode == 0
+        assert ret.data
+        state_run = next(iter(ret.data.values()))
+        assert state_run["result"] is True
+        # Check to make sure the file was created
+        assert target_path.is_file()
+        # The type of new line, ie, `\n` vs `\r\n` is not important
+        assert target_path.read_text() == "somegoodstuff"
+
+    sls_name = "issue-60426"
+    sls_contents = """
+    configuration file:
+      file.managed:
+        - name: {target_path}
+        - source: salt://foo_bar.jinja
+        - template: jinja
+        - makedirs: True
+
+    accumulated configstuff:
+      file.accumulated:
+        - filename: {target_path}
+        - text:
+          - some
+          - good
+          - stuff
+        - watch_in:
+          - file: configuration file
+    """.format(
+        target_path=target_path
+    )
+
+    sls_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.sls".format(sls_name), sls_contents
+    )
+
+    jinja_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.jinja".format(jinja_name), jinja_contents
+    )
+
+    with sls_tempfile, jinja_tempfile:
+        ret = salt_call_cli.run("state.apply", sls_name)
+        assert ret.returncode == 0
+        assert ret.data
+        state_run = next(iter(ret.data.values()))
+        assert state_run["result"] is True
+        # Check to make sure the file was created
+        assert target_path.is_file()
+        # The type of new line, ie, `\n` vs `\r\n` is not important
+        assert target_path.read_text() == "somegoodstuff"
+
+
+def test_issue_60203(
+    salt_master,
+    salt_call_cli,
+    tmp_path,
+    salt_minion,
+):
+    target_path = tmp_path / "issue-60203-target.txt"
+    sls_name = "issue-60203"
+    sls_contents = """
+    credentials exposed via file:
+      file.managed:
+        - name: /tmp/test.tar.gz
+        - source: 'https://account:dontshowme@notahost.saltstack.io/files/test.tar.gz'
+        - source_hash: 'https://account:dontshowme@notahost.saltstack.io/files/test.tar.gz.sha256'
+    """
+    sls_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.sls".format(sls_name), sls_contents
+    )
+    with sls_tempfile:
+        ret = salt_call_cli.run("state.apply", sls_name)
+        assert ret.returncode == 1
+        assert ret.data
+        assert (
+            "file_|-credentials exposed via file_|-/tmp/test.tar.gz_|-managed"
+            in ret.data
+        )
+        assert (
+            "comment"
+            in ret.data[
+                "file_|-credentials exposed via file_|-/tmp/test.tar.gz_|-managed"
+            ]
+        )
+        assert (
+            "Unable to manage"
+            in ret.data[
+                "file_|-credentials exposed via file_|-/tmp/test.tar.gz_|-managed"
+            ]["comment"]
+        )
+        assert (
+            "/files/test.tar.gz.sha256"
+            in ret.data[
+                "file_|-credentials exposed via file_|-/tmp/test.tar.gz_|-managed"
+            ]["comment"]
+        )
+        assert (
+            "dontshowme"
+            not in ret.data[
+                "file_|-credentials exposed via file_|-/tmp/test.tar.gz_|-managed"
+            ]["comment"]
+        )
+
+
+def test_clean_with_wildcard_requisites(
+    salt_master,
+    salt_call_cli,
+    pillar_tree,
+    tmp_path,
+    salt_minion,
+):
+    create_file = tmp_path / "foo"
+
+    sls_name = "file-directory-clean-wildcard"
+    sls_contents = """
+    {tmp_path}:
+      file.directory:
+        - clean: true
+        - require:
+          - file: {tmp_path}/*
+
+    {create_file}:
+      file.managed:
+        - contents: foo bar baz
+    """.format(
+        tmp_path=tmp_path,
+        create_file=create_file,
+    )
+
+    sls_tempfile = salt_master.state_tree.base.temp_file(
+        "{}.sls".format(sls_name), sls_contents
+    )
+    # A file that we expect to be cleaned up
+    clean_me = pytest.helpers.temp_file("bar", "bar", tmp_path)
+
+    with sls_tempfile, clean_me as clean_path:
+        ret = salt_call_cli.run("state.apply", sls_name)
+        assert ret.exitcode == 0
+        assert ret.json
+        states = iter(ret.json.values())
+
+        # Ensure the file was created
+        state_run = next(states)
+        assert state_run["result"] is True
+        assert create_file.is_file()
+
+        # Check to make sure the untracked file was cleaned up
+        state_run = next(states)
+        assert not clean_path.exists()
+        assert "removed" in state_run["changes"]
+        assert str(clean_path) in state_run["changes"]["removed"]
+
+
 @pytest.fixture
 def _check_min_patch_version(shell):
     min_patch_ver = "2.6"
