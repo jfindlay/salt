@@ -743,7 +743,8 @@ class LogLevelMixIn(metaclass=MixInMeta):
             self.config.pop("log_datefmt_console", None)
 
         datefmt = self.config.get(
-            "log_datefmt_console", self.config.get("log_datefmt", "%Y-%m-%d %H:%M:%S")
+            "log_datefmt_console",
+            self.config.get("log_datefmt", salt._logging.DFLT_LOG_DATEFMT),
         )
 
         # Save the settings back to the configuration
@@ -829,7 +830,7 @@ class LogLevelMixIn(metaclass=MixInMeta):
             "log_datefmt_logfile",
             self.config.get(
                 "log_datefmt_console",
-                self.config.get("log_datefmt", "%Y-%m-%d %H:%M:%S"),
+                self.config.get("log_datefmt", salt._logging.DFLT_LOG_DATEFMT),
             ),
         )
 
