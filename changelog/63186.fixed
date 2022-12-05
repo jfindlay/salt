@@ -1,1 +1,2 @@
-Disambiguate str vs tuple containment check in `salt/modules/xbpspkg.py`
+- Disambiguate str vs tuple containment check in `salt/modules/xbpspkg.py`
+- Do not log an error on optional missing import in `salt/roster/range.py`
